@@ -36,8 +36,9 @@ class MachineTestCase(unittest.TestCase):
 
         cc = CloudConfig()
         cc.instanceid = name + "-ci"
-        cc.password = name
-        cc.runcmd = "ip addr add 10.11.12.%s/24 dev eth1" % ipsuffix
+        cc.password = str(magicnumber)
+        #cc.runcmd = "ip link set dev eth1 up ; ip addr add {ipaddr}/24 dev eth1".format(ipaddr=ipaddr)
+        cc.runcmd = "nmcli con add ifname eth1 autoconnect yes type ethernet ip4 {ipaddr}/24".format(ipaddr=ipaddr)
         with open(dom._ssh_identity_file + ".pub", "rt") as src:
             cc.ssh_authorized_keys = [src.read().strip()]
         dom.set_cloud_config(cc)
@@ -112,7 +113,7 @@ class TestImgbaseNode(NodeTestCase):
         self.node.ssh("imgbase layout")
 
 
-@unittest.skip("Needs the Engine Appliance to work")
+#@unittest.skip("Needs the Engine Appliance to work")
 class IntegrationTestCase(MachineTestCase):
     ENGINE_ANSWERS = """
 # For 3.6
@@ -126,7 +127,7 @@ OVESETUP_DIALOG/confirmSettings=bool:True
 OVESETUP_CONFIG/applicationMode=str:both
 OVESETUP_CONFIG/remoteEngineSetupStyle=none:None
 OVESETUP_CONFIG/storageIsLocal=bool:False
-OVESETUP_CONFIG/firewallManager=str:iptables
+OVESETUP_CONFIG/firewallManager=str:firewalld
 OVESETUP_CONFIG/remoteEngineHostRootPassword=none:None
 OVESETUP_CONFIG/firewallChangesReview=bool:False
 OVESETUP_CONFIG/updateFirewall=bool:True
@@ -143,7 +144,7 @@ OVESETUP_DB/securedHostValidation=bool:False
 OVESETUP_DB/port=int:5432
 OVESETUP_ENGINE_CORE/enable=bool:True
 OVESETUP_CORE/engineStop=none:None
-OVESETUP_SYSTEM/memCheckEnabled=bool:True
+OVESETUP_SYSTEM/memCheckEnabled=bool:False
 OVESETUP_SYSTEM/nfsConfigEnabled=bool:False
 OVESETUP_CONFIG/sanWipeAfterDelete=bool:True
 OVESETUP_PKI/organization=str:Test
@@ -167,20 +168,26 @@ OVESETUP_VMCONSOLE_PROXY_CONFIG/vmconsoleProxyPort=int:2222
     @classmethod
     def setUpClass(cls):
         print("SetUpClass %s" % cls)
-        n = "-%s" % cls.__name__
-        cls.node = cls._start_vm("node" + n, NODE_IMG,
-                                 "node-" + n + ".qcow2", 77)
-        ENGINE_IMG = NODE_IMG
-        cls.engine = cls._start_vm("engine" + n, ENGINE_IMG,
-                                   "engine" + n + ".qcow2", 88)
+        n = "%s-" % cls.__name__
+        cls.node = cls._start_vm(n + "node", NODE_IMG,
+                                 n + "node.qcow2", 77)
+        ENGINE_IMG = "ovirt-engine-appliance.qcow2"
+        cls.engine = cls._start_vm(n + "engine", ENGINE_IMG,
+                                   n + "engine.qcow2", 88)
 
-        # FIXME
-        # Here we need to do the engine setup
+        #
+        # Do the engine setup
+        # This assumes that the engine was tested already and
+        # this could probably be pulled in a separate testcase
+        #
         debug("Installing engine")
-        cls.engine.post("/root/engine-answers", cls.ENGINE_ANSWERS)
+        cls.engine.post("/root/ovirt-engine-answers", cls.ENGINE_ANSWERS)
+        cls.engine.post("/etc/ovirt-engine/engine.conf.d/90-mem.conf", "ENGINE_PERM_MIN=128m\nENGINE_HEAP_MIN=1g\n")  # To reduce engines mem requirements
         cls.engine.start()
-        debug(cls.engine.ssh("engine-setup --offline --config=/root/engine-answers"))
+        debug(cls.engine.ssh("sed -i '/^127.0.0.1/ s/$/ engine.example.com/' /etc/hosts"))
+#        debug(cls.engine.ssh("engine-setup --offline --config-append=/root/ovirt-engine-answers"))
         cls.engine.shutdown()
+        cls.engine.wait_event("lifecycle")
         debug("Installation completed")
 
     @classmethod
@@ -202,11 +209,20 @@ OVESETUP_VMCONSOLE_PROXY_CONFIG/vmconsoleProxyPort=int:2222
 
 class TestIntegrationTestCase(IntegrationTestCase):
     def test_intra_network_connectivity(self):
-        debug("Node: %s" % self.node.ssh("ifconfig"))
-        debug("Engine: %s" % self.engine.ssh("ifconfig"))
+        import time
+        time.sleep(10)
+
+        debug(self.node.ssh("ifconfig"))
+        debug(self.engine.ssh("ifconfig"))
+
+        debug(self.node.ssh("arp -n"))
+        debug(self.engine.ssh("arp -n"))
 
         debug(self.node.ssh("ping -c1 10.11.12.88"))
         debug(self.engine.ssh("ping -c1 10.11.12.77"))
+
+    def test_engine_is_up(self):
+        debug(self.engine.ssh("curl --fail 127.0.0.1 | grep -i engine"))
 
     @unittest.skip("Not implemented")
     def test_add_host(self):
