@@ -27,8 +27,8 @@ class MachineTestCase(unittest.TestCase):
     def _start_vm(name, srcimg, tmpimg, magicnumber):
         debug("Strating new VM %s" % name)
 
-        ssh_port = 42000 + int(magicnumber)
-        ipsuffix = magicnumber
+        ssh_port = 22000 + int(magicnumber)
+        ipaddr = "10.11.12.%s" % magicnumber
 
         img = Image(srcimg).reflink(tmpimg)
         dom = VM.create(name, img, ssh_port=ssh_port)
@@ -49,7 +49,7 @@ class NodeTestCase(MachineTestCase):
     @classmethod
     def setUpClass(cls):
         debug("SetUpClass %s" % cls)
-        n = "node-%s" % cls.__name__
+        n = "%s-node" % cls.__name__
         cls.node = cls._start_vm(n, NODE_IMG, n + ".qcow2", 77)
 
     @classmethod

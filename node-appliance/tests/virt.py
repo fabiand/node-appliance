@@ -162,13 +162,15 @@ class VM():
                               name=name,
                               disk=("path=%s,bus=virtio,"
                                     "discard=unmap,cache=unsafe") % disk,
-                              memory=2048, vcpus=4, cpu="host",
+                              memory=2*1024, vcpus=4, cpu="host",
                               network="user,model=virtio",
                               watchdog="default,action=poweroff",
                               serial="pty",
-                              graphics="none",
+                              graphics="none",  # headless
                               noautoconsole=True,
                               filesystem="%s,HOST,mode=squash" % os.getcwd(),
+                              memballoon="virtio",  # To save some host-ram
+                              rng="/dev/random",  # For entropy
                               check="all=off")
 
         dom = __hack_dom_pre_creation(str(dom))
@@ -241,7 +243,11 @@ class VM():
 
     @logcall
     def shutdown(self):
-        sh.virsh("shutdown", self.name)
+        sh.virsh("shutdown", "--mode=acpi", self.name)
+
+    @logcall
+    def reboot(self):
+        sh.virsh("reboot", "--mode=acpi", self.name)
 
     @logcall
     def undefine(self):
