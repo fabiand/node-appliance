@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.DEBUG)
 import sh
 import os
 import tempfile
-import uuid
+import random
 from contextlib import contextmanager
 import xml.etree.ElementTree as ET
 
@@ -46,8 +46,11 @@ def get_ssh_pubkey():
 
 
 def random_mac():
-    mac = uuid.getnode()
-    return ':'.join(("%012X" % mac)[i:i+2] for i in range(0, 12, 2))
+    mac = [0x00, 0x16, 0x3e,
+           random.randint(0x00, 0x7f),
+           random.randint(0x00, 0xff),
+           random.randint(0x00, 0xff)]
+    return ':'.join(map(lambda x: "%02x" % x, mac))
 
 
 class CloudConfig():
