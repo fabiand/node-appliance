@@ -37,8 +37,8 @@ class MachineTestCase(unittest.TestCase):
         cc = CloudConfig()
         cc.instanceid = name + "-ci"
         cc.password = str(magicnumber)
-        #cc.runcmd = "ip link set dev eth1 up ; ip addr add {ipaddr}/24 dev eth1".format(ipaddr=ipaddr)
-        cc.runcmd = "nmcli con add ifname eth1 autoconnect yes type ethernet ip4 {ipaddr}/24".format(ipaddr=ipaddr)
+        # cc.runcmd = "ip link set dev eth1 up ; ip addr add {ipaddr}/24 dev eth1".format(ipaddr=ipaddr)
+        cc.runcmd = "nmcli con add con-name bus0 ifname eth1 autoconnect yes type ethernet ip4 {ipaddr}/24 ; nmcli con up id bus0".format(ipaddr=ipaddr)
         with open(dom._ssh_identity_file + ".pub", "rt") as src:
             cc.ssh_authorized_keys = [src.read().strip()]
         dom.set_cloud_config(cc)
@@ -180,12 +180,16 @@ OVESETUP_VMCONSOLE_PROXY_CONFIG/vmconsoleProxyPort=int:2222
         # This assumes that the engine was tested already and
         # this could probably be pulled in a separate testcase
         #
+        cls._engine_setup(cls)
+
+    @classmethod
+    def _engine_setup(cls):
         debug("Installing engine")
         cls.engine.post("/root/ovirt-engine-answers", cls.ENGINE_ANSWERS)
         cls.engine.post("/etc/ovirt-engine/engine.conf.d/90-mem.conf", "ENGINE_PERM_MIN=128m\nENGINE_HEAP_MIN=1g\n")  # To reduce engines mem requirements
         cls.engine.start()
         debug(cls.engine.ssh("sed -i '/^127.0.0.1/ s/$/ engine.example.com/' /etc/hosts"))
-#        debug(cls.engine.ssh("engine-setup --offline --config-append=/root/ovirt-engine-answers"))
+        debug(cls.engine.ssh("engine-setup --offline --config-append=/root/ovirt-engine-answers"))
         cls.engine.shutdown()
         cls.engine.wait_event("lifecycle")
         debug("Installation completed")
@@ -209,9 +213,6 @@ OVESETUP_VMCONSOLE_PROXY_CONFIG/vmconsoleProxyPort=int:2222
 
 class TestIntegrationTestCase(IntegrationTestCase):
     def test_intra_network_connectivity(self):
-        import time
-        time.sleep(10)
-
         debug(self.node.ssh("ifconfig"))
         debug(self.engine.ssh("ifconfig"))
 
