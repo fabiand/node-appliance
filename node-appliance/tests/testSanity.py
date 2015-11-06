@@ -188,8 +188,8 @@ OVESETUP_VMCONSOLE_PROXY_CONFIG/vmconsoleProxyPort=int:2222
         cls.engine.post("/root/ovirt-engine-answers", cls.ENGINE_ANSWERS)
         cls.engine.post("/etc/ovirt-engine/engine.conf.d/90-mem.conf", "ENGINE_PERM_MIN=128m\nENGINE_HEAP_MIN=1g\n")  # To reduce engines mem requirements
         cls.engine.start()
-        debug(cls.engine.ssh("sed -i '/^127.0.0.1/ s/$/ engine.example.com/' /etc/hosts"))
-        debug(cls.engine.ssh("engine-setup --offline --config-append=/root/ovirt-engine-answers"))
+        cls.engine.ssh("sed -i '/^127.0.0.1/ s/$/ engine.example.com/' /etc/hosts")
+        cls.engine.ssh("engine-setup --offline --config-append=/root/ovirt-engine-answers")
         cls.engine.shutdown()
         cls.engine.wait_event("lifecycle")
         debug("Installation completed")
@@ -213,14 +213,14 @@ OVESETUP_VMCONSOLE_PROXY_CONFIG/vmconsoleProxyPort=int:2222
 
 class TestIntegrationTestCase(IntegrationTestCase):
     def test_intra_network_connectivity(self):
-        debug(self.node.ssh("ifconfig"))
-        debug(self.engine.ssh("ifconfig"))
+        self.node.ssh("ifconfig")
+        self.engine.ssh("ifconfig")
 
-        debug(self.node.ssh("arp -n"))
-        debug(self.engine.ssh("arp -n"))
+        self.node.ssh("arp -n")
+        self.engine.ssh("arp -n")
 
-        debug(self.node.ssh("ping -c1 10.11.12.88"))
-        debug(self.engine.ssh("ping -c1 10.11.12.77"))
+        self.node.ssh("ping -c1 10.11.12.88")
+        self.engine.ssh("ping -c1 10.11.12.77")
 
     def test_engine_is_up(self):
         debug(self.engine.ssh("curl --fail 127.0.0.1 | grep -i engine"))

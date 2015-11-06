@@ -198,7 +198,9 @@ class VM():
                 "-oIdentityFile=" + self._ssh_identity_file,
                 "-p%s" % self._ssh_port) + args
         debug("SSHing: %s %s" % (args, kwargs))
-        return sh.ssh(*args, **kwargs)
+        data = sh.ssh(*args, **kwargs)
+        debug("stdout: %s" % data)
+        return data
 
     @logcall
     def attach_cdrom(self, iso):
