@@ -230,10 +230,16 @@ class TestIntegrationTestCase(IntegrationTestCase):
 
     @unittest.skip("Not implemented")
     def test_add_host(self):
+        cmd_add = "add host --name foo --address 192.168.178.50 --root_password 123 --cluster-name Default"
+
+    @unittest.skip("Not implemented")
+    def test_add_storage(self):
         pass
 
     @unittest.skip("Not implemented")
     def test_spawn_vm(self):
+        self.test_add_host()
+        self.test_add_storage()
         pass
 
 
