@@ -223,7 +223,10 @@ class TestIntegrationTestCase(IntegrationTestCase):
         self.engine.ssh("ping -c1 10.11.12.77")
 
     def test_engine_is_up(self):
-        debug(self.engine.ssh("curl --fail 127.0.0.1 | grep -i engine"))
+        self.engine.ssh("curl --fail 127.0.0.1 | grep -i engine")
+
+    def test_node_can_reach_engine(self):
+        self.node.ssh("curl --fail 10.11.22.88 | grep -i engine")
 
     @unittest.skip("Not implemented")
     def test_add_host(self):
