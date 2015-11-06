@@ -99,7 +99,7 @@ class TestBasicNode(NodeTestCase):
         self.node.ssh("rpm -q " + " ".join(pkgs))
 
 
-@unittest.skip("We need to test the installed image to fix this")
+@unittest.skip("We need to test the installed image to fix this, blocked by https://bugzilla.redhat.com/1278878")
 class TestImgbaseNode(NodeTestCase):
     def test_installed(self):
         debug("%s" % self.node.ssh("imgbase --version"))
@@ -113,12 +113,11 @@ class TestImgbaseNode(NodeTestCase):
         self.node.ssh("imgbase layout")
 
 
-#@unittest.skip("Needs the Engine Appliance to work")
 class IntegrationTestCase(MachineTestCase):
     ENGINE_ANSWERS = """
 # For 3.6
 [environment:default]
-OVESETUP_CONFIG/adminPassword=str:ovirt
+OVESETUP_CONFIG/adminPassword=str:PASSWORD
 OVESETUP_CONFIG/fqdn=str:engine.example.com
 OVESETUP_ENGINE_CONFIG/fqdn=str:engine.example.com
 OVESETUP_VMCONSOLE_PROXY_CONFIG/vmconsoleProxyHost=str:engine.example.com
@@ -152,7 +151,7 @@ OVESETUP_CONFIG/engineHeapMax=str:3987M
 OVESETUP_CONFIG/isoDomainName=str:ISO_DOMAIN
 OVESETUP_CONFIG/isoDomainMountPoint=str:/var/lib/exports/iso
 OVESETUP_CONFIG/isoDomainACL=str:*(rw)
-OVESETUP_CONFIG/engineHeapMin=str:3987M
+OVESETUP_CONFIG/engineHeapMin=str:100M
 OVESETUP_AIO/configure=none:None
 OVESETUP_AIO/storageDomainName=none:None
 OVESETUP_AIO/storageDomainDir=none:None
@@ -180,13 +179,34 @@ OVESETUP_VMCONSOLE_PROXY_CONFIG/vmconsoleProxyPort=int:2222
         # This assumes that the engine was tested already and
         # this could probably be pulled in a separate testcase
         #
-        cls._engine_setup(cls)
+        cls._engine_setup()
 
     @classmethod
     def _engine_setup(cls):
         debug("Installing engine")
-        cls.engine.post("/root/ovirt-engine-answers", cls.ENGINE_ANSWERS)
-        cls.engine.post("/etc/ovirt-engine/engine.conf.d/90-mem.conf", "ENGINE_PERM_MIN=128m\nENGINE_HEAP_MIN=1g\n")  # To reduce engines mem requirements
+        cls.engine.post("/root/ovirt-engine-answers",
+                        cls.ENGINE_ANSWERS)
+#        cls.engine.post("/etc/ovirt-engine/engine.conf.d/90-mem.conf",
+#                        "ENGINE_PERM_MIN=128m\nENGINE_HEAP_MIN=1g\n")  # To reduce engines mem requirements
+        cls.engine.post("/root/.ovirtshellrc", """
+[ovirt-shell]
+username = admin@internal
+password = PASSWORD
+
+renew_session = False
+timeout = None
+extended_prompt = False
+url = https://127.0.0.1/ovirt-engine/api
+insecure = True
+kerberos = False
+filter = False
+session_timeout = None
+ca_file = None
+dont_validate_cert_chain = True
+key_file = None
+cert_file = None
+""")
+
         cls.engine.start()
         cls.engine.ssh("sed -i '/^127.0.0.1/ s/$/ engine.example.com/' /etc/hosts")
         cls.engine.ssh("engine-setup --offline --config-append=/root/ovirt-engine-answers")
@@ -226,11 +246,28 @@ class TestIntegrationTestCase(IntegrationTestCase):
         self.engine.ssh("curl --fail 127.0.0.1 | grep -i engine")
 
     def test_node_can_reach_engine(self):
-        self.node.ssh("curl --fail 10.11.22.88 | grep -i engine")
+        self.node.ssh("ping -c1 10.11.12.88")
+        self.engine.ssh("ping -c1 10.11.12.77")
+        self.node.ssh("curl --fail 10.11.12.88 | grep -i engine")
 
-    @unittest.skip("Not implemented")
+    def engine_shell(self, cmd):
+        oshell = lambda cmd: self.engine.ssh("ovirt-shell --connect -E %r" % cmd)
+        def wait_engine():
+            while "disconnected" in oshell("ping"):
+                    debug("Waiting for engine ...")
+        wait_engine()
+        return oshell(cmd)
+
     def test_add_host(self):
-        cmd_add = "add host --name foo --address 192.168.178.50 --root_password 123 --cluster-name Default"
+        # Check if the shell is working
+        self.engine_shell("ping")
+
+        debug("Add the host")
+        self.engine_shell("add host --name foo --address 10.11.12.77 --root_password 77 --cluster-name Default")
+        self.assertTrue("foo" in self.engine_shell("list hosts"))
+
+        debug("Check that it will get up")
+        # FIXME
 
     @unittest.skip("Not implemented")
     def test_add_storage(self):
