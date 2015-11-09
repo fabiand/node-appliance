@@ -43,14 +43,14 @@ def gen_ssh_identity_file():
 
 class MachineTestCase(unittest.TestCase):
     @staticmethod
-    def _start_vm(name, srcimg, tmpimg, magicnumber):
+    def _start_vm(name, srcimg, tmpimg, magicnumber, memory_gb=2):
         debug("Strating new VM %s" % name)
 
         ssh_port = 22000 + int(magicnumber)
         ipaddr = "10.11.12.%s" % magicnumber
 
         img = Image(srcimg).reflink(tmpimg)
-        dom = VM.create(name, img, ssh_port=ssh_port)
+        dom = VM.create(name, img, ssh_port=ssh_port, memory_gb=memory_gb)
         dom._ssh_identity_file = gen_ssh_identity_file()
 
         cc = CloudConfig()
