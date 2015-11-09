@@ -35,6 +35,10 @@ NODE_IMG = os.environ.get("TEST_NODE_ROOTFS_IMG",
                           "ovirt-node-appliance.qcow2")
 
 
+class TimedoutError(Exception):
+    pass
+
+
 def gen_ssh_identity_file():
     f = tempfile.mkdtemp("testing-ssh") + "/id_rsa"
     sh.ssh_keygen(b=2048, t="rsa", f=f, N="", q=True)
@@ -286,7 +290,15 @@ class TestIntegrationTestCase(IntegrationTestCase):
         self.assertTrue("foo" in self.engine_shell("list hosts"))
 
         debug("Check that it will get up")
-        # FIXME
+        N = 180
+        while True:
+            if N == 0:
+                raise TimedoutError()
+            if "foo" in self.engine_shell("list hosts --query 'status=up'"):
+                break
+            N = N-1
+
+        self.engine_shell("list hosts --show-all")
 
     @unittest.skip("Not implemented")
     def test_add_storage(self):
