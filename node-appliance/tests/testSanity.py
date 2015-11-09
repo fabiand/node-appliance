@@ -191,28 +191,49 @@ OVESETUP_VMCONSOLE_PROXY_CONFIG/vmconsoleProxyPort=int:2222
 
     @classmethod
     def setUpClass(cls):
-        print("SetUpClass %s" % cls)
+        debug("SetUpClass %s" % cls)
         n = "%s-" % cls.__name__
         cls.node = cls._start_vm(n + "node", NODE_IMG,
                                  n + "node.qcow2", 77)
         ENGINE_IMG = "ovirt-engine-appliance.qcow2"
         cls.engine = cls._start_vm(n + "engine", ENGINE_IMG,
-                                   n + "engine.qcow2", 88)
+                                   n + "engine.qcow2", 88,
+                                   memory_gb=4)
 
         #
         # Do the engine setup
         # This assumes that the engine was tested already and
         # this could probably be pulled in a separate testcase
         #
+        cls._node_setup()
         cls._engine_setup()
+
+    @classmethod
+    def tearDownClass(cls):
+        debug("Tearing down %s" % cls)
+        cls.node = None
+        cls.engine = None
+
+    @classmethod
+    def _node_setup(cls):
+        cls.node.start()
+        debug("Disable firewalld")
+        cls.node.ssh("systemctl disable firewalld.service")
+        debug("Enable fake qemu support")
+        cls.node.ssh("yum install -y vdsm-hook-faqemu")
+        cls.node.ssh("sed -i '/vars/ a fake_kvm_support = true' /etc/vdsm/vdsm.conf")
+        # Bug-Url: https://bugzilla.redhat.com/show_bug.cgi?id=1279555
+        cls.node.ssh("sed -i '/fake_kvm_support/ s/false/true/' /usr/lib/python2.7/site-packages/vdsm/config.py")
+        cls.node.shutdown()
+        cls.node.wait_event("lifecycle")
 
     @classmethod
     def _engine_setup(cls):
         debug("Installing engine")
         cls.engine.post("/root/ovirt-engine-answers",
                         cls.ENGINE_ANSWERS)
-#        cls.engine.post("/etc/ovirt-engine/engine.conf.d/90-mem.conf",
-#                        "ENGINE_PERM_MIN=128m\nENGINE_HEAP_MIN=1g\n")  # To reduce engines mem requirements
+        cls.engine.post("/etc/ovirt-engine/engine.conf.d/90-mem.conf",
+                        "ENGINE_PERM_MIN=128m\nENGINE_HEAP_MIN=1g\n")  # To reduce engines mem requirements
         cls.engine.post("/root/.ovirtshellrc", """
 [ovirt-shell]
 username = admin@internal
@@ -238,12 +259,6 @@ cert_file = None
         cls.engine.shutdown()
         cls.engine.wait_event("lifecycle")
         debug("Installation completed")
-
-    @classmethod
-    def tearDownClass(cls):
-        debug("Tearing down %s" % cls)
-        cls.node = None
-        cls.engine = None
 
     def setUp(self):
         self.node_snapshot = self.node.snapshot()
