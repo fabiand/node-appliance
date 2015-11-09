@@ -138,10 +138,11 @@ class TestImgbaseNode(NodeTestCase):
 
 
 class IntegrationTestCase(MachineTestCase):
+    # FIXME reduce the number of answers to the minimum
     ENGINE_ANSWERS = """
 # For 3.6
 [environment:default]
-OVESETUP_CONFIG/adminPassword=str:PASSWORD
+OVESETUP_CONFIG/adminPassword=str:password
 OVESETUP_CONFIG/fqdn=str:engine.example.com
 OVESETUP_ENGINE_CONFIG/fqdn=str:engine.example.com
 OVESETUP_VMCONSOLE_PROXY_CONFIG/vmconsoleProxyHost=str:engine.example.com
@@ -215,7 +216,7 @@ OVESETUP_VMCONSOLE_PROXY_CONFIG/vmconsoleProxyPort=int:2222
         cls.engine.post("/root/.ovirtshellrc", """
 [ovirt-shell]
 username = admin@internal
-password = PASSWORD
+password = password
 
 renew_session = False
 timeout = None
