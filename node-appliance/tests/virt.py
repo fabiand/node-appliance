@@ -150,7 +150,7 @@ class VM():
         self.undefine()
 
     @staticmethod
-    def create(name, disk, ssh_port=None):
+    def create(name, disk, ssh_port=None, memory_gb=2):
         def __hack_dom_pre_creation(domxml):
             root = ET.fromstring(domxml)
 
@@ -181,7 +181,9 @@ class VM():
                               name=name,
                               disk=("path=%s,bus=virtio,"
                                     "discard=unmap,cache=unsafe") % disk,
-                              memory=2*1024, vcpus=4, cpu="host",
+                              memory=int(1024 * int(memory_gb)),
+                              vcpus=4,
+                              cpu="host",
                               network="user,model=virtio",
                               watchdog="default,action=poweroff",
                               serial="pty",
@@ -208,14 +210,16 @@ class VM():
 
     def ssh(self, *args, **kwargs):
         assert self._ssh_port
-        args = ("root@127.0.0.1", "-tt",
+        args = ("root@127.0.0.1",
+                "-oPort=%s" % self._ssh_port,
                 "-oConnectTimeout=30",
                 "-oConnectionAttempts=3",
                 "-oStrictHostKeyChecking=no",
                 "-oUserKnownHostsFile=/dev/null",
                 "-oBatchMode=yes",
+                "-oRequestTTY=force",
                 "-oIdentityFile=" + self._ssh_identity_file,
-                "-p%s" % self._ssh_port) + args
+                ) + args
         debug("SSHing: %s %s" % (args, kwargs))
         data = sh.ssh(*args, **kwargs)
         debug("stdout: %s" % data)
@@ -314,6 +318,10 @@ class VM():
         """Write data to a guest file
         """
         self.fish("write", remote, data)
+
+
+if __name__ == "__main__":
+    unittest.main()
 
 
 def legacy():
